@@ -1,3 +1,4 @@
+# renderer.py
 import textwrap
 import tempfile
 import webbrowser

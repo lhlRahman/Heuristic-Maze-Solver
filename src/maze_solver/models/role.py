@@ -1,3 +1,4 @@
+# role.py
 from enum import IntEnum
 
 class Role(IntEnum):

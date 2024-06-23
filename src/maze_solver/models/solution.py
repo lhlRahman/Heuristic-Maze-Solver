@@ -1,3 +1,4 @@
+# solution.py
 from dataclasses import dataclass
 from typing import Iterator, Sequence
 

@@ -1,3 +1,5 @@
+# square.py
+
 from dataclasses import dataclass
 from enum import IntFlag, auto
 from typing import Optional

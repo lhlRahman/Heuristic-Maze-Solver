@@ -1,3 +1,4 @@
+# serializer.py
 import array
 import pathlib
 from typing import Iterator

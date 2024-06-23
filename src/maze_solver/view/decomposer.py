@@ -1,3 +1,4 @@
+# decomposer.py
 from maze_solver.models.border import Border
 from maze_solver.view.primitives import (
     DisjointLines,
