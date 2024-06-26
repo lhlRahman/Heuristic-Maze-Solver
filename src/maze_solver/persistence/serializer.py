@@ -16,21 +16,12 @@ def compress(square: Square) -> int:
 def decompress(square_value: int) -> tuple[Border, Role]:
     return Border(square_value & 0xf), Role(square_value >> 4)
 
-def serialize(
-    width: int,
-    height: int,
-    squares: tuple[Square, ...]
-) -> tuple[FileHeader, FileBody]:
+def serialize(width: int, height: int, squares: tuple[Square, ...]) -> tuple[FileHeader, FileBody]:
     header = FileHeader(FORMAT_VERSION, width, height)
     body = FileBody(array.array("B", map(compress, squares)))
     return header, body
 
-def dump_squares(
-    width: int,
-    height: int,
-    squares: tuple[Square, ...],
-    path: pathlib.Path
-) -> None:
+def dump_squares(width: int, height: int, squares: tuple[Square, ...], path: pathlib.Path) -> None:
     header, body = serialize(width, height, squares)
     with path.open(mode="wb") as file:
         header.write(file)

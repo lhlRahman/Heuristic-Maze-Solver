@@ -3,15 +3,14 @@ import textwrap
 import tempfile
 import webbrowser
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 from maze_solver.models.maze import Maze
 from maze_solver.models.role import Role
 from maze_solver.models.solution import Solution
 from maze_solver.models.square import Square
-from maze_solver.view.decomposer import decompose
 from maze_solver.view.primitives import Point, Polyline, Rect, Text, tag
+from maze_solver.view.decomposer import decompose
 
 @dataclass(frozen=True)
 class SVG:
@@ -25,12 +24,33 @@ class SVG:
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1">
-          <title>SVG Preview</title>
+          <title>SVG Animation</title>
+          <style>
+            svg {{ display: none; }}
+            svg.active {{ display: block; }}
+          </style>
+          <script>
+            let currentStep = 0;
+            const steps = {len(self.xml_content)};
+            const delay = {self.delay * 1000};  // Convert to milliseconds
+
+            function showNextStep() {{
+              const svgs = document.querySelectorAll('svg');
+              svgs[currentStep].classList.remove('active');
+              currentStep = (currentStep + 1) % steps;
+              svgs[currentStep].classList.add('active');
+            }}
+
+            window.onload = function() {{
+              document.querySelector('svg').classList.add('active');
+              setInterval(showNextStep, delay);
+            }}
+          </script>
         </head>
         <body>
-        {0}
+        {self.xml_content}
         </body>
-        </html>""").format(self.xml_content)
+        </html>""")
 
     def preview(self) -> None:
         with tempfile.NamedTemporaryFile(
@@ -64,12 +84,36 @@ class SVGRenderer:
             )
         )
 
+    def render_step(self, maze: Maze, step: List[Square]) -> SVG:
+        margins = 2 * (self.offset + self.line_width)
+        width = margins + maze.width * self.square_size
+        height = margins + maze.height * self.square_size
+        return SVG(
+            tag(
+                "svg",
+                content=self._get_body_step(maze, step),
+                xmlns="http://www.w3.org/2000/svg",
+                stroke_linejoin="round",
+                width="100vw",
+                height="100vh",
+                viewBox=f"0 0 {width} {height}",
+            )
+        )
+
     def _get_body(self, maze: Maze, solution: Optional[Solution]) -> str:
         return "".join([
             arrow_marker(),
             background(self.square_size * maze.width, self.square_size * maze.height),
             *map(self._draw_square, maze),
             self._draw_solution(solution) if solution else "",
+        ])
+
+    def _get_body_step(self, maze: Maze, step: List[Square]) -> str:
+        return "".join([
+            arrow_marker(),
+            background(self.square_size * maze.width, self.square_size * maze.height),
+            *map(self._draw_square, maze),
+            self._draw_solution_step(step)
         ])
 
     def _transform(self, square: Square, extra_offset: int = 0) -> Point:
@@ -105,6 +149,20 @@ class SVGRenderer:
             [
                 self._transform(point, self.square_size // 2)
                 for point in solution
+            ]
+        ).draw(
+            stroke_width=self.line_width * 2,
+            stroke_opacity="0.5",
+            stroke="red",
+            fill="none",
+            marker_end="url(#arrow)"
+        )
+
+    def _draw_solution_step(self, step: List[Square]) -> str:
+        return Polyline(
+            [
+                self._transform(point, self.square_size // 2)
+                for point in step if point is not None
             ]
         ).draw(
             stroke_width=self.line_width * 2,

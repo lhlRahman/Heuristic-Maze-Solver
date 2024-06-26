@@ -1,12 +1,6 @@
 # decomposer.py
 from maze_solver.models.border import Border
-from maze_solver.view.primitives import (
-    DisjointLines,
-    Line,
-    Point,
-    Polyline,
-    Primitive
-)
+from maze_solver.view.primitives import DisjointLines, Line, Point, Polyline, Primitive
 
 def decompose(border: Border, top_left: Point, square_size: int) -> Primitive:
     bottom_left = top_left.translate(y=square_size)

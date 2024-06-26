@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "C/C++ Runner: Debug Session",
+      "type": "lldb",
+      "request": "launch",
+      "args": [],
+      "cwd": "/Users/habibrahman/Code/maze_solver/src/maze_solver",
+      "program": "/Users/habibrahman/Code/maze_solver/src/maze_solver/build/Debug/outDebug"
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+# solver.py
 import textwrap
 import tempfile
 import webbrowser
@@ -178,7 +179,7 @@ class SVGRenderer:
         )
 
 ROLE_EMOJI = {
-    Role.ENTRANCE: "\N{pedestrian}",
+    Role.ENTRANCE: "\N{mouse}",
     Role.EXIT: "\N{chequered flag}",
     Role.ENEMY: "\N{ghost}",
     Role.REWARD: "\N{white medium star}",
@@ -272,11 +273,39 @@ def animate_solution(maze: Maze, solution_steps: List[List[Square]], delay: floa
         file.write(html_content)
     webbrowser.open(f"file://{file.name}")
 
-def solve_all_steps(maze: Maze) -> List[List[Square]]:
-    start = maze.entrance
-    goal = maze.exit
-    solution_steps = a_star_search_steps(maze, start, goal)
-    return solution_steps if solution_steps else []
+def solve_maze_python(maze_path: Path, output_dir: Path, algorithm: str, animation: bool, delay: float, direction: str) -> None:
+    maze = Maze.load(maze_path)
+    if algorithm == "bfs":
+        solution_steps = bfs(maze, maze.entrance, maze.exit)
+    elif algorithm == "dfs":
+        solution_steps = dfs(maze, maze.entrance, maze.exit)
+    elif algorithm == "dijkstra":
+        solution_steps = dijkstra(maze, maze.entrance, maze.exit)
+    elif algorithm == "greedy":
+        solution_steps = greedy_best_first(maze, maze.entrance, maze.exit)
+    elif algorithm == "wall-follower":
+        solution_steps = wall_follower(maze, maze.entrance, maze.exit)
+    elif algorithm == "dead-end":
+        solution_steps = dead_end_filling(maze, maze.entrance, maze.exit)
+    elif algorithm == "recursive-bt":
+        solution_steps = recursive_backtracking(maze, maze.entrance, maze.exit)
+    else:
+        raise ValueError(f"Unsupported algorithm: {algorithm}")
+
+    if solution_steps:
+        if animation:
+            animate_solution(maze, solution_steps, delay, direction)
+        else:
+            renderer = SVGRenderer()
+            if direction == "bottom-up":
+                solution_steps.reverse()
+            svg = renderer.render_step(maze, solution_steps[-1])
+            svg.preview()
+            svg_file_path = output_dir / "solution.svg"
+            with open(svg_file_path, 'w') as f:
+                f.write(svg.xml_content)
+    else:
+        print("No solution found")
 
 def a_star_search_steps(maze: Maze, start: Square, goal: Square) -> Optional[List[List[Square]]]:
     open_set = []
@@ -394,7 +423,21 @@ def wall_follower(maze: Maze, start: Square, goal: Square) -> Optional[List[List
         return (direction[1], -direction[0])
 
     def move_forward(square, direction):
-        return maze.squares[(square.row + direction[1]) * maze.width + (square.column + direction[0])]
+        next_row, next_col = square.row + direction[1], square.column + direction[0]
+        if 0 <= next_row < maze.height and 0 <= next_col < maze.width:
+            return maze.squares[next_row * maze.width + next_col]
+        return None
+
+    def has_wall(square, direction):
+        if direction == (0, -1):  # up
+            return square.border & Border.TOP
+        elif direction == (1, 0):  # right
+            return square.border & Border.RIGHT
+        elif direction == (0, 1):  # down
+            return square.border & Border.BOTTOM
+        elif direction == (-1, 0):  # left
+            return square.border & Border.LEFT
+        return False
 
     current = start
     direction = (1, 0)  # Start by going right
@@ -403,17 +446,19 @@ def wall_follower(maze: Maze, start: Square, goal: Square) -> Optional[List[List
     while current != goal:
         left = turn_left(direction)
         left_square = move_forward(current, left)
-        if not (current.border & left[1]):
+        if left_square and not has_wall(current, left):
             direction = left
             current = left_square
-        elif not (current.border & direction[1]):
+        elif not has_wall(current, direction):
             current = move_forward(current, direction)
         else:
             direction = turn_right(direction)
-
+            current = move_forward(current, direction)
+        
         path.append(current)
 
     return [path]
+
 
 def dead_end_filling(maze: Maze, start: Square, goal: Square) -> Optional[List[List[Square]]]:
     def is_dead_end(square):

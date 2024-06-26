@@ -1,5 +1,4 @@
 # file_format.py
-
 import struct
 from dataclasses import dataclass
 from typing import BinaryIO

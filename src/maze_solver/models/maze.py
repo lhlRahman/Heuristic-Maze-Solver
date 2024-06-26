@@ -1,23 +1,25 @@
-# maze.py
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
-from typing import Iterator
+from typing import List, Iterator
 
 from maze_solver.models.role import Role
 from maze_solver.models.square import Square
 
 @dataclass(frozen=True)
 class Maze:
-    squares: tuple[Square, ...]
+    squares: List[Square]
 
     @classmethod
     def load(cls, path: Path) -> "Maze":
-        from maze_solver.persistence.serializer import load_squares  # Moved here to avoid circular import
-        return cls(tuple(load_squares(path)))
+        from maze_solver.persistence.serializer import load_squares
+        squares = list(load_squares(path))
+        if not squares:
+            raise ValueError("The maze file is empty or malformed")
+        return cls(squares)
 
     def dump(self, path: Path) -> None:
-        from maze_solver.persistence.serializer import dump_squares  # Moved here to avoid circular import
+        from maze_solver.persistence.serializer import dump_squares
         dump_squares(self.width, self.height, self.squares, path)
 
     @cached_property

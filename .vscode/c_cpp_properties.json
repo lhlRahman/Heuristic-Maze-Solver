@@ -1,0 +1,22 @@
+{
+  "configurations": [
+      {
+          "name": "macos-clang-arm64",
+          "includePath": [
+              "${workspaceFolder}/**",
+              "/Users/habibrahman/.pyenv/versions/3.9.11/include/python3.9",
+              "${workspaceFolder}/pybind11/include"
+          ],
+          "defines": [],
+          "macFrameworkPath": [
+              "/System/Library/Frameworks",
+              "/Library/Frameworks"
+          ],
+          "compilerPath": "/usr/bin/clang",
+          "cStandard": "c11",
+          "cppStandard": "c++17",
+          "intelliSenseMode": "macos-clang-x64"
+      }
+  ],
+  "version": 4
+}
