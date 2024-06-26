@@ -173,7 +173,7 @@ class SVGRenderer:
         )
 
 ROLE_EMOJI = {
-    Role.ENTRANCE: "\N{pedestrian}",
+    Role.ENTRANCE: "\N{mice}",
     Role.EXIT: "\N{chequered flag}",
     Role.ENEMY: "\N{ghost}",
     Role.REWARD: "\N{white medium star}",

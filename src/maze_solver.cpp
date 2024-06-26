@@ -15,7 +15,6 @@
 #include <bitset>
 #include <functional>
 
-// Function implementations...
 
 std::vector<Square> reconstruct_path(const std::map<Square, Square>& came_from, const Square& start, const Square& goal) {
     std::vector<Square> path;
