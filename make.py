@@ -148,51 +148,6 @@ def generate_maze_prims(width: int, height: int) -> Maze:
 
     return Maze(squares=tuple(squares))
 
-def generate_maze_recursive_division(width: int, height: int) -> Maze:
-    maze = [[Square(row * width + col, row, col, Border.TOP | Border.BOTTOM | Border.LEFT | Border.RIGHT) for col in range(width)] for row in range(height)]
-    squares = []
-
-    def divide(x, y, w, h, orientation):
-        if w < 2 or h < 2:
-            return
-
-        horizontal = orientation == 'H'
-        wx = x + (0 if horizontal else random.randint(0, w - 2))
-        wy = y + (random.randint(0, h - 2) if horizontal else 0)
-        px = wx + (0 if horizontal else random.randint(0, w - 1))
-        py = wy + (random.randint(0, h - 1) if horizontal else 0)
-        dx = 1 if horizontal else 0
-        dy = 0 if horizontal else 1
-        length = w if horizontal else h
-        dir = Border.BOTTOM if horizontal else Border.RIGHT
-
-        for i in range(length):
-            if wx != px or wy != py:
-                maze[wy][wx] = Square(maze[wy][wx].index, wy, wx, maze[wy][wx].border | dir)
-            wx += dx
-            wy += dy
-
-        nx, ny = x, y
-        nw, nh = (w, wy - y) if horizontal else (wx - x, h)
-        divide(nx, ny, nw, nh, 'H' if nw > nh else 'V')
-
-        nx, ny = (x, wy + 1) if horizontal else (wx + 1, y)
-        nw, nh = (w, y + h - wy - 1) if horizontal else (x + w - wx - 1, h)
-        divide(nx, ny, nw, nh, 'H' if nw > nh else 'V')
-
-    divide(0, 0, width, height, 'H' if width > height else 'V')
-
-    for row in maze:
-        for square in row:
-            squares.append(square)
-
-    maze[0][0] = Square(maze[0][0].index, 0, 0, maze[0][0].border, Role.ENTRANCE)
-    maze[height-1][width-1] = Square(maze[height-1][width-1].index, height-1, width-1, maze[height-1][width-1].border, Role.EXIT)
-
-    squares[0] = maze[0][0]
-    squares[-1] = maze[height-1][width-1]
-
-    return Maze(squares=tuple(squares))
 
 def main():
     width = int(input("Enter maze width: "))
@@ -201,8 +156,7 @@ def main():
     print("1. Depth-First Search (DFS)")
     print("2. Kruskal's Algorithm")
     print("3. Prim's Algorithm")
-    print("4. Recursive Division")
-    choice = int(input("Enter choice (1-4): "))
+    choice = int(input("Enter choice (1-3): "))
 
     if choice == 1:
         maze = generate_maze_dfs(width, height)
@@ -210,8 +164,6 @@ def main():
         maze = generate_maze_kruskal(width, height)
     elif choice == 3:
         maze = generate_maze_prims(width, height)
-    elif choice == 4:
-        maze = generate_maze_recursive_division(width, height)
     else:
         print("Invalid choice")
         return
