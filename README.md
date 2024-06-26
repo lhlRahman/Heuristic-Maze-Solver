@@ -46,6 +46,11 @@
 
 ### Command Line Interface
 
+You can genrate mazes using maze.py
+```sh
+python maze.py
+```
+
 You can run the maze solver from the command line with the following syntax:
 
 ```sh
