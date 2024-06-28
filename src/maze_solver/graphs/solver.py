@@ -289,6 +289,8 @@ def solve_maze_python(maze_path: Path, output_dir: Path, algorithm: str, animati
         solution_steps = dead_end_filling(maze, maze.entrance, maze.exit)
     elif algorithm == "recursive-bt":
         solution_steps = recursive_backtracking(maze, maze.entrance, maze.exit)
+    elif algorithm == "a-star":
+        solution_steps = a_star_search_steps(maze, maze.entrance, maze.exit)
     else:
         raise ValueError(f"Unsupported algorithm: {algorithm}")
 
@@ -452,12 +454,15 @@ def wall_follower(maze: Maze, start: Square, goal: Square) -> Optional[List[List
         elif not has_wall(current, direction):
             current = move_forward(current, direction)
         else:
-            direction = turn_right(direction)
+            while has_wall(current, direction):
+                direction = turn_right(direction)
             current = move_forward(current, direction)
-        
-        path.append(current)
 
-    return [path]
+        if current is not None:
+            path.append(current)
+
+    return [path] if current == goal else None
+
 
 
 def dead_end_filling(maze: Maze, start: Square, goal: Square) -> Optional[List[List[Square]]]:
