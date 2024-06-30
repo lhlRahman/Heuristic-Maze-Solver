@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Set, Tuple
 import heapq
 import time
-from collections import deque
+from collections import defaultdict, deque
 
 from maze_solver.models.border import Border
 from maze_solver.models.maze import Maze
@@ -313,25 +313,24 @@ def a_star_search_steps(maze: Maze, start: Square, goal: Square) -> Optional[Lis
     open_set = []
     heapq.heappush(open_set, (0, start))
     came_from: Dict[Square, Square] = {}
-
-    g_score = {square: float('inf') for square in maze.squares}
+    
+    g_score = defaultdict(lambda: float('inf'))
     g_score[start] = 0
-    f_score = {square: float('inf') for square in maze.squares}
+    f_score = defaultdict(lambda: float('inf'))
     f_score[start] = heuristic(start, goal)
-
+    
     open_set_hash = {start}
-
+    
     while open_set:
         current = heapq.heappop(open_set)[1]
         open_set_hash.remove(current)
-
+        
         if current == goal:
             return reconstruct_path(came_from, current)
-
-        neighbors = get_neighbors(maze, current)
-        for neighbor in neighbors:
+        
+        for neighbor in get_neighbors(maze, current):
             tentative_g_score = g_score[current] + 1
-
+            
             if tentative_g_score < g_score[neighbor]:
                 came_from[neighbor] = current
                 g_score[neighbor] = tentative_g_score
@@ -339,82 +338,82 @@ def a_star_search_steps(maze: Maze, start: Square, goal: Square) -> Optional[Lis
                 if neighbor not in open_set_hash:
                     heapq.heappush(open_set, (f_score[neighbor], neighbor))
                     open_set_hash.add(neighbor)
-
+    
     return None
+
 
 def bfs(maze: Maze, start: Square, goal: Square) -> Optional[List[List[Square]]]:
     queue = deque([start])
     came_from: Dict[Square, Optional[Square]] = {start: None}
-
+    
     while queue:
         current = queue.popleft()
-
+        
         if current == goal:
             return reconstruct_path(came_from, current)
-
+        
         for neighbor in get_neighbors(maze, current):
             if neighbor not in came_from:
                 queue.append(neighbor)
                 came_from[neighbor] = current
-
+    
     return None
 
 def dfs(maze: Maze, start: Square, goal: Square) -> Optional[List[List[Square]]]:
     stack = [start]
     came_from: Dict[Square, Optional[Square]] = {start: None}
-
+    
     while stack:
         current = stack.pop()
-
+        
         if current == goal:
             return reconstruct_path(came_from, current)
-
+        
         for neighbor in get_neighbors(maze, current):
             if neighbor not in came_from:
                 stack.append(neighbor)
                 came_from[neighbor] = current
-
+    
     return None
 
 def dijkstra(maze: Maze, start: Square, goal: Square) -> Optional[List[List[Square]]]:
     open_set = []
     heapq.heappush(open_set, (0, start))
     came_from: Dict[Square, Optional[Square]] = {start: None}
-    cost_so_far = {start: 0}
-
+    cost_so_far = defaultdict(lambda: float('inf'))
+    cost_so_far[start] = 0
+    
     while open_set:
         current_cost, current = heapq.heappop(open_set)
-
+        
         if current == goal:
             return reconstruct_path(came_from, current)
-
+        
         for neighbor in get_neighbors(maze, current):
             new_cost = cost_so_far[current] + 1  # Assuming uniform cost
-            if neighbor not in cost_so_far or new_cost < cost_so_far[neighbor]:
+            if new_cost < cost_so_far[neighbor]:
                 cost_so_far[neighbor] = new_cost
-                priority = new_cost
-                heapq.heappush(open_set, (priority, neighbor))
+                heapq.heappush(open_set, (new_cost, neighbor))
                 came_from[neighbor] = current
-
+    
     return None
 
 def greedy_best_first(maze: Maze, start: Square, goal: Square) -> Optional[List[List[Square]]]:
     open_set = []
     heapq.heappush(open_set, (heuristic(start, goal), start))
     came_from: Dict[Square, Optional[Square]] = {start: None}
-
+    
     while open_set:
         _, current = heapq.heappop(open_set)
-
+        
         if current == goal:
             return reconstruct_path(came_from, current)
-
+        
         for neighbor in get_neighbors(maze, current):
             if neighbor not in came_from:
-                priority = heuristic(neighbor, goal)
-                heapq.heappush(open_set, (priority, neighbor))
+                heapq.heappush(open_set, (heuristic(neighbor, goal), neighbor))
                 came_from[neighbor] = current
-
+    
     return None
 
 def wall_follower(maze: Maze, start: Square, goal: Square) -> Optional[List[List[Square]]]:
@@ -479,7 +478,7 @@ def dead_end_filling(maze: Maze, start: Square, goal: Square) -> Optional[List[L
 
 def recursive_backtracking(maze: Maze, start: Square, goal: Square) -> Optional[List[List[Square]]]:
     path = []
-    visited = set()
+    visited: Set[Square] = set()
 
     def backtrack(square):
         if square == goal:
