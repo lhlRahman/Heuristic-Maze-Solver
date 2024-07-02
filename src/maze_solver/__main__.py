@@ -1,3 +1,5 @@
+# __main__.py
+
 import struct
 import argparse
 import pathlib
@@ -48,7 +50,6 @@ def solve_maze_cpp_wrapper(path, algorithm, animation, delay, direction, output_
         magic_number, format_version, width, height = struct.unpack('<4sBII', header)
         square_values = f.read()
 
-    # Debug: Print the header information
     print(f"Magic number: {magic_number}")
     print(f"Format version: {format_version}")
     print(f"Width: {width}, Height: {height}")
@@ -58,42 +59,29 @@ def solve_maze_cpp_wrapper(path, algorithm, animation, delay, direction, output_
         row, column = divmod(i, width)
         index = i
         border, role = decompress(square_values[i])
-        squares.append(Square(index, row, column, border, role))
+        squares.append(SquareC(row, column, index, border, role))
 
-    # Debug: Print the number of squares read
     print(f"Number of squares read: {len(squares)}")
 
-    # Verify that all squares are within bounds
-    for square in squares:
-        if square.row >= height or square.column >= width:
-            print(f"Error: Square out of bounds - {square}")
-            return
-
-    print(f"Maze dimensions: {width}x{height}")
-    print(f"Number of squares: {len(squares)}")
-
     # Define start and goal positions
-    start_row, start_col = 0, 0  # or any other logic to determine start
-    goal_row, goal_col = height - 1, width - 1  # or any other logic to determine goal
-
-    # Convert to SquareC for ctypes
-    squares_c = [SquareC(s.row, s.column, s.index, s.border, s.role) for s in squares]
+    start_row, start_col = 0, 0
+    goal_row, goal_col = height - 1, width - 1
 
     # Solve the maze using the C++ solver
-    SquareArrayType = SquareC * len(squares_c)
-    squares_array = SquareArrayType(*squares_c)  # Create a ctypes array of SquareC
-    steps = solve_maze(width, height, squares_array, start_row, start_col, goal_row, goal_col, algorithm, animation, delay, direction)
+    steps = solve_maze(width, height, squares, start_row, start_col, goal_row, goal_col, 
+                       algorithm, animation, delay, direction)
 
     if animation:
-        # Generate the HTML content for each step in C++
+        # Generate the HTML content for animation
         generate_html_animation(width, height, steps, str(output_dir), delay, direction == "top-down")
+        html_file_path = output_dir / "animation.html"
     else:
-        # Generate the HTML content in C++
+        # Generate the HTML content for the final solution
         html_file_path = output_dir / "solution.html"
         generate_html(steps[-1], str(html_file_path))
 
-        # Open the HTML file in the browser
-        webbrowser.open(f"file://{html_file_path.resolve()}")
+    # Open the HTML file in the browser
+    webbrowser.open(f"file://{html_file_path.resolve()}")
 
 def solve_maze_python_wrapper(maze_path: pathlib.Path, output_dir: pathlib.Path, algorithm: str, animation: bool, delay: float, direction: str, test = False) -> None:
     # Create output directory if it doesn't exist

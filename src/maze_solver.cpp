@@ -1,54 +1,116 @@
-#include "maze_solver.h"
+// maze_solver.cpp
 #include <iostream>
-#include <fstream>
 #include <vector>
 #include <queue>
 #include <stack>
 #include <map>
-#include <algorithm>
-#include <sstream>
-#include <filesystem>
-#include <chrono>
-#include <thread>
+#include <unordered_map>
 #include <set>
-#include <bitset>
+#include <unordered_set>
+#include <algorithm>
+#include <cmath>
+#include <random>
+#include <chrono>
 #include <functional>
+#include <limits>
+#include <fstream>
+#include <sstream>
+#include <bitset>
+#include <optional>
 
-// Debugging helper
-#define DEBUG_PRINT(x) std::cout << x << std::endl;
+// Structure definitions
 
-std::vector<Square> reconstruct_path(const std::map<Square, Square>& came_from, const Square& start, const Square& goal) {
+struct Square {
+    int row, column, index;
+    int border;
+    int role;
+
+    bool operator==(const Square& other) const {
+        return row == other.row && column == other.column;
+    }
+
+    bool operator<(const Square& other) const {
+        return std::tie(row, column) < std::tie(other.row, other.column);
+    }
+};
+
+std::vector<std::vector<Square>> g_steps;
+int g_step_count = 0;
+
+// Custom hash function for Square
+namespace std {
+    template <>
+    struct hash<Square> {
+        size_t operator()(const Square& s) const {
+            return hash<int>()(s.row) ^ hash<int>()(s.column);
+        }
+    };
+}
+
+class Maze {
+public:
+    int width, height;
+    std::vector<Square> squares;
+
+    Maze(int w, int h, const std::vector<Square>& s) : width(w), height(h), squares(s) {}
+
+    Square get_square(int row, int col) const {
+        return squares[row * width + col];
+    }
+
+    std::vector<Square> get_neighbors(const Square& square) const {
+        std::vector<Square> neighbors;
+        const int dx[] = {0, 1, 0, -1};
+        const int dy[] = {1, 0, -1, 0};
+        for (int i = 0; i < 4; ++i) {
+            int new_row = square.row + dy[i];
+            int new_col = square.column + dx[i];
+            if (new_row >= 0 && new_row < height && new_col >= 0 && new_col < width) {
+                if (!(square.border & (1 << i))) {
+                    neighbors.push_back(get_square(new_row, new_col));
+                }
+            }
+        }
+        return neighbors;
+    }
+};
+
+// Helper functions
+std::vector<Square> reconstruct_path(const std::unordered_map<Square, Square>& came_from, const Square& start, const Square& current) {
     std::vector<Square> path;
-    Square current = goal;
-    while (!(current == start)) {
-        path.push_back(current);
-        current = came_from.at(current);
+    Square current_node = current;
+    while (!(current_node == start)) {
+        path.push_back(current_node);
+        current_node = came_from.at(current_node);
     }
     path.push_back(start);
     std::reverse(path.begin(), path.end());
     return path;
 }
 
-std::vector<Square> bfs(const Maze &maze, const Square &start, const Square &goal, std::vector<std::vector<Square>>& steps) {
-    std::queue<Square> queue;
-    queue.push(start);
-    std::map<Square, Square> came_from;
+
+// Algorithm implementations
+std::vector<Square> bfs(const Maze& maze, const Square& start, const Square& goal, std::vector<std::vector<Square>>& steps) {
+    std::queue<Square> frontier;
+    frontier.push(start);
+    std::unordered_map<Square, Square> came_from;
     came_from[start] = start;
 
-    while (!queue.empty()) {
-        Square current = queue.front();
-        queue.pop();
+    while (!frontier.empty()) {
+        Square current = frontier.front();
+        frontier.pop();
 
         if (current == goal) {
-            steps.push_back(reconstruct_path(came_from, start, goal));
-            return steps.back();
+            auto path = reconstruct_path(came_from, start, goal);
+            steps.push_back(path);
+            return path;
         }
 
-        for (const Square& neighbor : maze.get_neighbors(current)) {
-            if (came_from.find(neighbor) == came_from.end()) {
-                queue.push(neighbor);
-                came_from[neighbor] = current;
-                steps.push_back(reconstruct_path(came_from, start, neighbor));
+        for (const Square& next : maze.get_neighbors(current)) {
+            if (came_from.find(next) == came_from.end()) {
+                frontier.push(next);
+                came_from[next] = current;
+                steps.push_back(reconstruct_path(came_from, start, next));
             }
         }
     }
@@ -56,26 +118,28 @@ std::vector<Square> bfs(const Maze &maze, const Square &start, const Square &goa
     return {};
 }
 
-std::vector<Square> dfs(const Maze &maze, const Square &start, const Square &goal, std::vector<std::vector<Square>>& steps) {
-    std::stack<Square> stack;
-    stack.push(start);
-    std::map<Square, Square> came_from;
+// DFS implementation
+std::vector<Square> dfs(const Maze& maze, const Square& start, const Square& goal, std::vector<std::vector<Square>>& steps) {
+    std::stack<Square> frontier;
+    frontier.push(start);
+    std::unordered_map<Square, Square> came_from;
     came_from[start] = start;
 
-    while (!stack.empty()) {
-        Square current = stack.top();
-        stack.pop();
+    while (!frontier.empty()) {
+        Square current = frontier.top();
+        frontier.pop();
 
         if (current == goal) {
-            steps.push_back(reconstruct_path(came_from, start, goal));
-            return steps.back();
+            auto path = reconstruct_path(came_from, start, goal);
+            steps.push_back(path);
+            return path;
         }
 
-        for (const Square& neighbor : maze.get_neighbors(current)) {
-            if (came_from.find(neighbor) == came_from.end()) {
-                stack.push(neighbor);
-                came_from[neighbor] = current;
-                steps.push_back(reconstruct_path(came_from, start, neighbor));
+        for (const Square& next : maze.get_neighbors(current)) {
+            if (came_from.find(next) == came_from.end()) {
+                frontier.push(next);
+                came_from[next] = current;
+                steps.push_back(reconstruct_path(came_from, start, next));
             }
         }
     }
@@ -83,31 +147,35 @@ std::vector<Square> dfs(const Maze &maze, const Square &start, const Square &goa
     return {};
 }
 
-std::vector<Square> dijkstra(const Maze &maze, const Square &start, const Square &goal, std::vector<std::vector<Square>>& steps) {
-    auto compare = [](const std::pair<int, Square>& a, const std::pair<int, Square>& b) { return a.first > b.first; };
-    std::priority_queue<std::pair<int, Square>, std::vector<std::pair<int, Square>>, decltype(compare)> queue(compare);
-    queue.push({0, start});
-    std::map<Square, Square> came_from;
+// Dijkstra implementation
+std::vector<Square> dijkstra(const Maze& maze, const Square& start, const Square& goal, std::vector<std::vector<Square>>& steps) {
+    auto compare = [](const std::pair<int, Square>& a, const std::pair<int, Square>& b) {
+        return a.first > b.first;
+    };
+    std::priority_queue<std::pair<int, Square>, std::vector<std::pair<int, Square>>, decltype(compare)> frontier(compare);
+    frontier.push({0, start});
+    std::unordered_map<Square, Square> came_from;
+    std::unordered_map<Square, int> cost_so_far;
     came_from[start] = start;
-    std::map<Square, int> cost_so_far;
     cost_so_far[start] = 0;
 
-    while (!queue.empty()) {
-        Square current = queue.top().second;
-        queue.pop();
+    while (!frontier.empty()) {
+        Square current = frontier.top().second;
+        frontier.pop();
 
         if (current == goal) {
-            steps.push_back(reconstruct_path(came_from, start, goal));
-            return steps.back();
+            auto path = reconstruct_path(came_from, start, goal);
+            steps.push_back(path);
+            return path;
         }
 
-        for (const Square& neighbor : maze.get_neighbors(current)) {
+        for (const Square& next : maze.get_neighbors(current)) {
             int new_cost = cost_so_far[current] + 1;
-            if (cost_so_far.find(neighbor) == cost_so_far.end() || new_cost < cost_so_far[neighbor]) {
-                cost_so_far[neighbor] = new_cost;
-                queue.push({new_cost, neighbor});
-                came_from[neighbor] = current;
-                steps.push_back(reconstruct_path(came_from, start, neighbor));
+            if (cost_so_far.find(next) == cost_so_far.end() || new_cost < cost_so_far[next]) {
+                cost_so_far[next] = new_cost;
+                frontier.push({new_cost, next});
+                came_from[next] = current;
+                steps.push_back(reconstruct_path(came_from, start, next));
             }
         }
     }
@@ -115,92 +183,151 @@ std::vector<Square> dijkstra(const Maze &maze, const Square &start, const Square
     return {};
 }
 
-std::vector<Square> greedy_best_first(const Maze &maze, const Square &start, const Square &goal, std::vector<std::vector<Square>>& steps) {
-    auto heuristic = [](const Square& a, const Square& b) { return std::abs(a.row - b.row) + std::abs(a.column - b.column); };
-    auto compare = [](const std::pair<int, Square>& a, const std::pair<int, Square>& b) { return a.first > b.first; };
-    std::priority_queue<std::pair<int, Square>, std::vector<std::pair<int, Square>>, decltype(compare)> queue(compare);
-    queue.push({heuristic(start, goal), start});
-    std::map<Square, Square> came_from;
-    came_from[start] = start;
-
-    while (!queue.empty()) {
-        Square current = queue.top().second;
-        queue.pop();
-
-        if (current == goal) {
-            steps.push_back(reconstruct_path(came_from, start, goal));
-            return steps.back();
-        }
-
-        for (const Square& neighbor : maze.get_neighbors(current)) {
-            if (came_from.find(neighbor) == came_from.end()) {
-                queue.push({heuristic(neighbor, goal), neighbor});
-                came_from[neighbor] = current;
-                steps.push_back(reconstruct_path(came_from, start, neighbor));
-            }
-        }
-    }
-
-    return {};
-}
-
-std::vector<Square> wall_follower(const Maze &maze, const Square &start, const Square &goal, std::vector<std::vector<Square>>& steps) {
-    auto turn_left = [](const std::pair<int, int>& direction) { return std::make_pair(-direction.second, direction.first); };
-    auto turn_right = [](const std::pair<int, int>& direction) { return std::make_pair(direction.second, -direction.first); };
-    auto move_forward = [&maze](const Square& square, const std::pair<int, int>& direction) {
-        int new_row = square.row + direction.first;
-        int new_col = square.column + direction.second;
-        if (new_row >= 0 && new_row < maze.height && new_col >= 0 && new_col < maze.width) {
-            return maze.get_square(new_row, new_col);
-        }
-        return square;
+// A* implementation
+std::vector<Square> a_star(const Maze& maze, const Square& start, const Square& goal, std::vector<std::vector<Square>>& steps) {
+    auto heuristic = [](const Square& a, const Square& b) {
+        return std::abs(a.row - b.row) + std::abs(a.column - b.column);
     };
 
-    Square current = start;
-    std::pair<int, int> direction = {1, 0};
-    std::vector<Square> path = {current};
-    steps.push_back(path);
+    auto compare = [](const std::pair<int, Square>& a, const std::pair<int, Square>& b) {
+        return a.first > b.first;
+    };
 
-    while (!(current == goal)) {
-        auto left = turn_left(direction);
-        auto left_square = move_forward(current, left);
-        if (!(current.border & left.first)) {
-            direction = left;
-            current = left_square;
-        } else if (!(current.border & direction.first)) {
-            current = move_forward(current, direction);
-        } else {
-            direction = turn_right(direction);
+    std::priority_queue<std::pair<int, Square>, std::vector<std::pair<int, Square>>, decltype(compare)> frontier(compare);
+    frontier.push({0, start});
+    std::unordered_map<Square, Square> came_from;
+    std::unordered_map<Square, int> cost_so_far;
+    came_from[start] = start;
+    cost_so_far[start] = 0;
+
+    while (!frontier.empty()) {
+        Square current = frontier.top().second;
+        frontier.pop();
+
+        if (current == goal) {
+            auto path = reconstruct_path(came_from, start, goal);
+            steps.push_back(path);
+            return path;
         }
-        path.push_back(current);
-        steps.push_back(path);
+
+        for (const Square& next : maze.get_neighbors(current)) {
+            int new_cost = cost_so_far[current] + 1;
+            if (cost_so_far.find(next) == cost_so_far.end() || new_cost < cost_so_far[next]) {
+                cost_so_far[next] = new_cost;
+                int priority = new_cost + heuristic(next, goal);
+                frontier.push({priority, next});
+                came_from[next] = current;
+                steps.push_back(reconstruct_path(came_from, start, next));
+            }
+        }
     }
 
+    return {};
+}
+
+// Greedy Best-First Search implementation
+std::vector<Square> greedy_best_first(const Maze& maze, const Square& start, const Square& goal, std::vector<std::vector<Square>>& steps) {
+    auto heuristic = [](const Square& a, const Square& b) {
+        return std::abs(a.row - b.row) + std::abs(a.column - b.column);
+    };
+
+    auto compare = [](const std::pair<int, Square>& a, const std::pair<int, Square>& b) {
+        return a.first > b.first;
+    };
+
+    std::priority_queue<std::pair<int, Square>, std::vector<std::pair<int, Square>>, decltype(compare)> frontier(compare);
+    frontier.push({heuristic(start, goal), start});
+    std::unordered_map<Square, Square> came_from;
+    came_from[start] = start;
+
+    while (!frontier.empty()) {
+        Square current = frontier.top().second;
+        frontier.pop();
+
+        if (current == goal) {
+            auto path = reconstruct_path(came_from, start, goal);
+            steps.push_back(path);
+            return path;
+        }
+
+        for (const Square& next : maze.get_neighbors(current)) {
+            if (came_from.find(next) == came_from.end()) {
+                int priority = heuristic(next, goal);
+                frontier.push({priority, next});
+                came_from[next] = current;
+                steps.push_back(reconstruct_path(came_from, start, next));
+            }
+        }
+    }
+
+    return {};
+}
+
+// Wall Follower implementation
+std::vector<Square> wall_follower(const Maze& maze, const Square& start, const Square& goal, std::vector<std::vector<Square>>& steps) {
+    std::vector<Square> path;
+    Square current = start;
+    int direction = 0; // 0: right, 1: down, 2: left, 3: up
+    const int dx[] = {0, 1, 0, -1};
+    const int dy[] = {1, 0, -1, 0};
+
+    while (!(current == goal)) {
+        path.push_back(current);
+        steps.push_back(path);
+
+        int left_dir = (direction + 3) % 4;
+        int new_row = current.row + dy[left_dir];
+        int new_col = current.column + dx[left_dir];
+
+        if (new_row >= 0 && new_row < maze.height && new_col >= 0 && new_col < maze.width &&
+            !(current.border & (1 << left_dir))) {
+            direction = left_dir;
+            current = maze.get_square(new_row, new_col);
+        }
+        else if (!(current.border & (1 << direction))) {
+            new_row = current.row + dy[direction];
+            new_col = current.column + dx[direction];
+            current = maze.get_square(new_row, new_col);
+        }
+        else {
+            direction = (direction + 1) % 4;
+        }
+    }
+
+    path.push_back(goal);
+    steps.push_back(path);
     return path;
 }
 
-std::vector<Square> dead_end_filling(const Maze &maze, const Square &start, const Square &goal, std::vector<std::vector<Square>>& steps) {
-    auto is_dead_end = [](const Square& square) {
-        return std::bitset<4>(square.border).count() == 3;
-    };
-
-    std::vector<Square> new_squares = maze.squares;
-    for (auto& square : new_squares) {
-        if (is_dead_end(square)) {
-            square.role = 4;
+// Dead-end Filling implementation
+std::vector<Square> dead_end_filling(const Maze& maze, const Square& start, const Square& goal, std::vector<std::vector<Square>>& steps) {
+    Maze new_maze = maze;
+    bool changed;
+    do {
+        changed = false;
+        for (int i = 0; i < new_maze.height; ++i) {
+            for (int j = 0; j < new_maze.width; ++j) {
+                Square& square = new_maze.squares[i * new_maze.width + j];
+                if (!(square == start) && !(square == goal) && std::bitset<4>(square.border).count() == 3) {
+                    square.border = 15; // Mark as filled
+                    changed = true;
+                }
+            }
         }
-    }
+    } while (changed);
 
-    Maze new_maze(maze.width, maze.height, new_squares);
     return dijkstra(new_maze, start, goal, steps);
 }
 
-std::vector<Square> recursive_backtracking(const Maze &maze, const Square &start, const Square &goal, std::vector<std::vector<Square>>& steps) {
+// Recursive Backtracking implementation
+std::vector<Square> recursive_backtracking(const Maze& maze, const Square& start, const Square& goal, std::vector<std::vector<Square>>& steps) {
     std::vector<Square> path;
     std::set<Square> visited;
 
     std::function<bool(const Square&)> backtrack = [&](const Square& square) {
         if (square == goal) {
+            path.push_back(square);
+            steps.push_back(path);
             return true;
         }
         visited.insert(square);
@@ -224,121 +351,297 @@ std::vector<Square> recursive_backtracking(const Maze &maze, const Square &start
     return path;
 }
 
-std::string generate_html_frame(const std::vector<Square>& squares, int width, int height, int square_size) {
-    std::stringstream html_content;
-    html_content << "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" width=\"" << (width * square_size) << "\" height=\"" << (height * square_size) << "\">\n";
-    for (const Square& square : squares) {
-        html_content << "<rect x=\"" << (square.column * square_size) << "\" y=\"" << (square.row * square_size) << "\" width=\"" << square_size << "\" height=\"" << square_size << "\" fill=\"black\" />\n";
+// Jump Point Search implementation
+std::vector<Square> jump_point_search(const Maze& maze, const Square& start, const Square& goal, std::vector<std::vector<Square>>& steps) {
+    auto heuristic = [](const Square& a, const Square& b) {
+        return std::max(std::abs(a.row - b.row), std::abs(a.column - b.column));
+    };
+
+    auto identify_successors = [&](const Square& node, const Square& parent) {
+        std::vector<Square> successors;
+        int dx = node.column - parent.column;
+        int dy = node.row - parent.row;
+
+        // Implement diagonal and straight movement pruning rules
+        // This is a simplified version and can be expanded for better performance
+
+        for (const Square& neighbor : maze.get_neighbors(node)) {
+            int new_dx = neighbor.column - node.column;
+            int new_dy = neighbor.row - node.row;
+
+            if ((new_dx == dx && new_dy == dy) || 
+                (new_dx != 0 && new_dy != 0 && (maze.get_square(node.row, neighbor.column).border & 15) == 0 && (maze.get_square(neighbor.row, node.column).border & 15) == 0)) {
+                successors.push_back(neighbor);
+            }
+        }
+
+        return successors;
+    };
+
+    std::function<std::optional<Square>(int, int, int, int)> jump = [&](int x, int y, int dx, int dy) -> std::optional<Square> {
+        int next_x = x + dx;
+        int next_y = y + dy;
+
+        if (!maze.get_square(next_y, next_x).border) {
+            return std::nullopt;
+        }
+
+        Square next_square = maze.get_square(next_y, next_x);
+
+        if (next_square == goal) {
+            return next_square;
+        }
+
+        // Check for forced neighbors
+        // This is a simplified check and can be expanded for better performance
+        for (const Square& neighbor : maze.get_neighbors(next_square)) {
+            Square current = maze.get_square(y, x);
+            // Use the '==' operator and invert its logic to simulate '!='
+            if (!(neighbor == current) && !neighbor.border) {
+                return next_square;
+            }
+        }
+
+        // Recursively apply jump in the direction of motion
+        if (dx != 0 && dy != 0) {
+            if (jump(next_x, next_y, dx, 0) || jump(next_x, next_y, 0, dy)) {
+                return next_square;
+            }
+        }
+
+        if (dx != 0 || dy != 0) {
+            return jump(next_x, next_y, dx, dy);
+        }
+
+        return std::nullopt;
+    };
+
+    std::priority_queue<std::pair<int, Square>, std::vector<std::pair<int, Square>>, std::greater<>> open_set;
+    std::unordered_map<Square, Square> came_from;
+    std::unordered_map<Square, int> g_score;
+
+    open_set.push({0, start});
+    g_score[start] = 0;
+
+    while (!open_set.empty()) {
+        Square current = open_set.top().second;
+        open_set.pop();
+
+        if (current == goal) {
+            auto path = reconstruct_path(came_from, start, goal);
+            steps.push_back(path);
+            return path;
+        }
+
+        for (const Square& successor : identify_successors(current, came_from[current])) {
+            auto jump_point = jump(successor.column, successor.row, successor.column - current.column, successor.row - current.row);
+            if (jump_point) {
+                int tentative_g_score = g_score[current] + heuristic(current, *jump_point);
+                if (g_score.find(*jump_point) == g_score.end() || tentative_g_score < g_score[*jump_point]) {
+                    came_from[*jump_point] = current;
+                    g_score[*jump_point] = tentative_g_score;
+                    int f_score = tentative_g_score + heuristic(*jump_point, goal);
+                    open_set.push({f_score, *jump_point});
+                    steps.push_back(reconstruct_path(came_from, start, *jump_point));
+                }
+            }
+        }
     }
-    html_content << "</svg>\n";
-    return html_content.str();
+
+    return {};
 }
 
-void generate_html_animation(const std::vector<std::vector<Square>>& steps, const Maze& maze, const std::string& output_file, float delay, bool top_down) {
-    std::ofstream html_file(output_file);
-    std::stringstream html_content;
+std::vector<Square> bidirectional_search(const Maze& maze, const Square& start, const Square& goal) {
+    std::queue<Square> queue_start, queue_goal;
+    std::unordered_map<Square, Square> came_from_start, came_from_goal;
+    std::unordered_set<Square> visited_start, visited_goal;
 
-    int square_size = 10;
-    int width = maze.width * square_size;
-    int height = maze.height * square_size;
+    queue_start.push(start);
+    queue_goal.push(goal);
+    came_from_start[start] = start;
+    came_from_goal[goal] = goal;
+    visited_start.insert(start);
+    visited_goal.insert(goal);
 
-    html_content << "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n";
-    html_content << "<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n";
-    html_content << "<title>SVG Animation</title>\n<style>\n";
-    html_content << "svg { display: none; }\n";
-    html_content << "svg.active { display: block; }\n";
-    html_content << "</style>\n<script>\n";
-    html_content << "let currentStep = 0;\n";
-    html_content << "const steps = " << steps.size() << ";\n";
-    html_content << "const delay = " << (delay * 1000) << ";\n";
-    html_content << "function showNextStep() {\n";
-    html_content << "  const svgs = document.querySelectorAll('svg');\n";
-    html_content << "  svgs[currentStep].classList.remove('active');\n";
-    html_content << "  currentStep = (currentStep + 1) % steps;\n";
-    html_content << "  svgs[currentStep].classList.add('active');\n";
-    html_content << "}\n";
-    html_content << "window.onload = function() {\n";
-    html_content << "  document.querySelector('svg').classList.add('active');\n";
-    html_content << "  setInterval(showNextStep, delay);\n";
-    html_content << "}\n";
-    html_content << "</script>\n</head>\n<body>\n";
+    while (!queue_start.empty() && !queue_goal.empty()) {
+        // Expand from start
+        Square current_start = queue_start.front();
+        queue_start.pop();
 
-    for (const auto& step : steps) {
-        html_content << "<div>\n";
-        html_content << generate_html_frame(step, maze.width, maze.height, square_size);
-        html_content << "</div>\n";
+        for (const Square& next : maze.get_neighbors(current_start)) {
+            if (visited_start.find(next) == visited_start.end()) {
+                queue_start.push(next);
+                visited_start.insert(next);
+                came_from_start[next] = current_start;
+
+                if (visited_goal.find(next) != visited_goal.end()) {
+                    // Path found
+                    std::vector<Square> path_start = reconstruct_path(came_from_start, start, next);
+                    std::vector<Square> path_goal = reconstruct_path(came_from_goal, goal, next);
+                    std::reverse(path_goal.begin(), path_goal.end());
+                    path_start.insert(path_start.end(), path_goal.begin() + 1, path_goal.end());
+                    return path_start;
+                }
+            }
+        }
+
+        // Expand from goal
+        Square current_goal = queue_goal.front();
+        queue_goal.pop();
+
+        for (const Square& next : maze.get_neighbors(current_goal)) {
+            if (visited_goal.find(next) == visited_goal.end()) {
+                queue_goal.push(next);
+                visited_goal.insert(next);
+                came_from_goal[next] = current_goal;
+
+                if (visited_start.find(next) != visited_start.end()) {
+                    // Path found
+                    std::vector<Square> path_start = reconstruct_path(came_from_start, start, next);
+                    std::vector<Square> path_goal = reconstruct_path(came_from_goal, goal, next);
+                    std::reverse(path_goal.begin(), path_goal.end());
+                    path_start.insert(path_start.end(), path_goal.begin() + 1, path_goal.end());
+                    return path_start;
+                }
+            }
+        }
+
+        g_steps.push_back(reconstruct_path(came_from_start, start, current_start));
+        g_steps.push_back(reconstruct_path(came_from_goal, goal, current_goal));
     }
 
-    html_content << "</body>\n</html>\n";
-    html_file << html_content.str();
-    html_file.close();
+    return {}; // No path found
 }
 
+// HTML generation functions
 void generate_html(const std::vector<Square>& path, const std::string& filename) {
     std::ofstream html_file(filename);
-    std::stringstream html_content;
-
     int square_size = 10;
     int width = 50 * square_size;
     int height = 50 * square_size;
 
-    html_content << "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n";
-    html_content << "<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n";
-    html_content << "<title>SVG Path</title>\n</head>\n<body>\n";
-    html_content << "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" width=\"" << width << "\" height=\"" << height << "\">\n";
+    html_file << "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n"
+              << "<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
+              << "<title>Maze Solution</title>\n</head>\n<body>\n"
+              << "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" width=\"" << width << "\" height=\"" << height << "\">\n";
 
     for (const Square& square : path) {
-        html_content << "<rect x=\"" << square.column * square_size << "\" y=\"" << square.row * square_size << "\" width=\"" << square_size << "\" height=\"" << square_size << "\" fill=\"black\" />\n";
+        html_file << "<rect x=\"" << square.column * square_size << "\" y=\"" << square.row * square_size
+                  << "\" width=\"" << square_size << "\" height=\"" << square_size << "\" fill=\"black\" />\n";
     }
 
-    html_content << "</svg>\n</body>\n</html>\n";
-    html_file << html_content.str();
+    html_file << "</svg>\n</body>\n</html>\n";
     html_file.close();
 }
 
+void generate_html_animation(const std::vector<std::vector<Square>>& steps, const Maze& maze, const std::string& output_file, float delay, bool top_down) {
+    std::ofstream html_file(output_file);
+    int square_size = 10;
+    int width = maze.width * square_size;
+    int height = maze.height * square_size;
+
+    html_file << "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n"
+              << "<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
+              << "<title>Maze Solution Animation</title>\n<style>\n"
+              << "svg { display: none; }\n"
+              << "svg.active { display: block; }\n"
+              << "</style>\n<script>\n"
+              << "let currentStep = 0;\n"
+              << "const steps = " << steps.size() << ";\n"
+              << "const delay = " << (delay * 1000) << ";\n"
+              << "function showNextStep() {\n"
+              << "  const svgs = document.querySelectorAll('svg');\n"
+              << "  svgs[currentStep].classList.remove('active');\n"
+              << "  currentStep = (currentStep + 1) % steps;\n"
+              << "  svgs[currentStep].classList.add('active');\n"
+              << "}\n"
+              << "window.onload = function() {\n"
+              << "  document.querySelector('svg').classList.add('active');\n"
+              << "  setInterval(showNextStep, delay);\n"
+              << "}\n"
+              << "</script>\n</head>\n<body>\n";
+
+    for (const auto& step : steps) {
+        html_file << "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" width=\"" << width << "\" height=\"" << height << "\">\n";
+        for (const Square& square : step) {
+            html_file << "<rect x=\"" << square.column * square_size << "\" y=\"" << square.row * square_size
+                      << "\" width=\"" << square_size << "\" height=\"" << square_size << "\" fill=\"black\" />\n";
+        }
+        html_file << "</svg>\n";
+    }
+
+    html_file << "</body>\n</html>\n";
+    html_file.close();
+}
+
+// Main solve_maze function
 std::vector<Square> solve_maze(int width, int height, const std::vector<Square>& squares, int start_row, int start_col, int goal_row, int goal_col, const std::string& algorithm, bool animation, float delay, const std::string& direction) {
     Maze maze(width, height, squares);
-    DEBUG_PRINT("Maze created");
     Square start = maze.get_square(start_row, start_col);
-    DEBUG_PRINT("Start square: (" << start.row << ", " << start.column << ")");
     Square goal = maze.get_square(goal_row, goal_col);
-    DEBUG_PRINT("Goal square: (" << goal.row << ", " << goal.column << ")");
 
+    g_steps.clear();
     std::vector<Square> path;
-    std::vector<std::vector<Square>> steps;
 
     if (algorithm == "bfs") {
-        path = bfs(maze, start, goal, steps);
+        path = bfs(maze, start, goal, g_steps);
     } else if (algorithm == "dfs") {
-        path = dfs(maze, start, goal, steps);
+        path = dfs(maze, start, goal, g_steps);
     } else if (algorithm == "dijkstra") {
-        path = dijkstra(maze, start, goal, steps);
+        path = dijkstra(maze, start, goal, g_steps);
+    } else if (algorithm == "a-star") {
+        path = a_star(maze, start, goal, g_steps);
     } else if (algorithm == "greedy") {
-        path = greedy_best_first(maze, start, goal, steps);
+        path = greedy_best_first(maze, start, goal, g_steps);
     } else if (algorithm == "wall-follower") {
-        path = wall_follower(maze, start, goal, steps);
+        path = wall_follower(maze, start, goal, g_steps);
     } else if (algorithm == "dead-end") {
-        path = dead_end_filling(maze, start, goal, steps);
+        path = dead_end_filling(maze, start, goal, g_steps);
     } else if (algorithm == "recursive-bt") {
-        path = recursive_backtracking(maze, start, goal, steps);
+        path = recursive_backtracking(maze, start, goal, g_steps);
+    } else if (algorithm == "jump-point") {
+        path = jump_point_search(maze, start, goal, g_steps);
     } else {
         std::cerr << "Unknown algorithm: " << algorithm << std::endl;
         return {};
     }
 
-    if (animation) {
-        generate_html_animation(steps, maze, "animation.html", delay, direction == "top-down");
-    } else {
-        generate_html(path, "solution.html");
-    }
+    g_step_count = g_steps.size();
 
     return path;
 }
 
+
+// C interface functions
 extern "C" {
-    void solve_maze_c(int width, int height, Square* squares, int start_row, int start_col, int goal_row, int goal_col, const char* algorithm, bool animation, float delay, const char* direction) {
+    Square** solve_maze_c(int width, int height, Square* squares, int start_row, int start_col, int goal_row, int goal_col, const char* algorithm, bool animation, float delay, const char* direction) {
         std::vector<Square> squares_vec(squares, squares + width * height);
-        solve_maze(width, height, squares_vec, start_row, start_col, goal_row, goal_col, algorithm, animation, delay, direction);
+        std::vector<Square> solution = solve_maze(width, height, squares_vec, start_row, start_col, goal_row, goal_col, algorithm, animation, delay, direction);
+        
+        Square** result = new Square*[g_steps.size()];
+        for (size_t i = 0; i < g_steps.size(); ++i) {
+            result[i] = new Square[g_steps[i].size()];
+            std::copy(g_steps[i].begin(), g_steps[i].end(), result[i]);
+        }
+        return result;
+    }
+
+    int get_step_count() {
+        return g_step_count;
+    }
+
+    int get_step_size(int step_index) {
+        if (step_index >= 0 && step_index < g_step_count) {
+            return g_steps[step_index].size();
+        }
+        return 0;
+    }
+
+    void free_steps(Square** steps) {
+        for (int i = 0; i < g_step_count; ++i) {
+            delete[] steps[i];
+        }
+        delete[] steps;
     }
 
     void generate_html_c(const Square* path, int path_length, const char* output_file) {
@@ -353,6 +656,7 @@ extern "C" {
             steps_vec.emplace_back(current_step, current_step + step_lengths[i]);
             current_step += step_lengths[i];
         }
-        generate_html_animation(steps_vec, Maze(width, height, std::vector<Square>(steps, steps + num_steps)), output_dir, delay, top_down);
+        Maze maze(width, height, std::vector<Square>(steps, steps + width * height));
+        generate_html_animation(steps_vec, maze, output_dir, delay, top_down);
     }
 }

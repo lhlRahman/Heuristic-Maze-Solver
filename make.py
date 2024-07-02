@@ -1,4 +1,5 @@
 import random
+import time
 from typing import List, Tuple
 from maze_solver.models.border import Border
 from maze_solver.models.maze import Maze
@@ -157,6 +158,8 @@ def main():
     print("2. Kruskal's Algorithm")
     print("3. Prim's Algorithm")
     choice = int(input("Enter choice (1-3): "))
+    
+    start = time.time()
 
     if choice == 1:
         maze = generate_maze_dfs(width, height)
@@ -168,8 +171,12 @@ def main():
         print("Invalid choice")
         return
 
+    end = time.time()
+
     path = Path("large_example.maze")
     dump_squares(maze.width, maze.height, maze.squares, path)
+    
+    print(f"Time taken: {end - start:.2f}")
 
     print(f"Maze of size {width}x{height} generated and saved to {path}.")
     print(f"Entrance: {maze.squares[0]}")

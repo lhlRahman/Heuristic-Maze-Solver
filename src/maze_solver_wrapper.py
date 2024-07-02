@@ -1,3 +1,4 @@
+# maze_solver_wrapper.py
 import ctypes
 from ctypes import c_bool, c_char_p, c_float, c_int, Structure, POINTER
 from typing import List, Iterable
@@ -12,11 +13,19 @@ class SquareC(Structure):
     ]
 
 # Load the shared library
-maze_solver_lib = ctypes.CDLL('src/maze_solver/libmaze_solver.dylib')
-
+maze_solver_lib = ctypes.CDLL('./libmaze_solver.dylib')
 # Define the C functions
 maze_solver_lib.solve_maze_c.argtypes = [c_int, c_int, POINTER(SquareC), c_int, c_int, c_int, c_int, c_char_p, c_bool, c_float, c_char_p]
-maze_solver_lib.solve_maze_c.restype = None
+maze_solver_lib.solve_maze_c.restype = POINTER(POINTER(SquareC))
+
+maze_solver_lib.get_step_count.argtypes = []
+maze_solver_lib.get_step_count.restype = c_int
+
+maze_solver_lib.get_step_size.argtypes = [c_int]
+maze_solver_lib.get_step_size.restype = c_int
+
+maze_solver_lib.free_steps.argtypes = [POINTER(POINTER(SquareC))]
+maze_solver_lib.free_steps.restype = None
 
 maze_solver_lib.generate_html_c.argtypes = [POINTER(SquareC), c_int, c_char_p]
 maze_solver_lib.generate_html_c.restype = None
@@ -25,29 +34,21 @@ maze_solver_lib.generate_html_animation_c.argtypes = [c_int, c_int, POINTER(Squa
 maze_solver_lib.generate_html_animation_c.restype = None
 
 def solve_maze(width, height, squares, start_row, start_col, goal_row, goal_col, algorithm, animation, delay, direction):
-    # Construct Square instances correctly
     SquareArrayType = SquareC * len(squares)
     squares_array = SquareArrayType(*squares)
     
-    steps = []
-    maze_solver_lib.solve_maze_c(width, height, squares_array, start_row, start_col, goal_row, goal_col, algorithm.encode('utf-8'), animation, delay, direction.encode('utf-8'))
+    steps_ptr = maze_solver_lib.solve_maze_c(width, height, squares_array, start_row, start_col, goal_row, goal_col, 
+                                             algorithm.encode('utf-8'), animation, delay, direction.encode('utf-8'))
     
-    if animation:
-        # Collect the steps for animation
-        steps = collect_animation_steps(width, height)
-    else:
-        steps = [squares_array]  # Final path
-
-    return steps
-
-def collect_animation_steps(width, height):
-    # Simulate collecting steps from C++ (for demonstration purposes)
+    step_count = maze_solver_lib.get_step_count()
     steps = []
-    for i in range(10):  # Simulate 10 steps
-        step = (SquareC * (width * height))()
-        for j in range(width * height):
-            step[j] = SquareC(j // width, j % width, j, 0, 0)  # Fill with dummy data
+    for i in range(step_count):
+        step_size = maze_solver_lib.get_step_size(i)
+        step = [steps_ptr[i][j] for j in range(step_size)]
         steps.append(step)
+    
+    maze_solver_lib.free_steps(steps_ptr)
+    
     return steps
 
 def generate_html(path, output_file):
