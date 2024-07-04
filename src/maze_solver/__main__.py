@@ -198,4 +198,4 @@ def time_algorithms(maze_path: Path, output_dir: Path, animation: bool, delay: f
             print(f"{algorithm}: {elapsed_time:.2f} seconds")
 
 if __name__ == "__main__":
-    time_algorithms(Path("large_example.maze"), Path("output"), False, 0.5, "top-down")
+    main()
