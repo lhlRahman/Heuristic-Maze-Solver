@@ -7,6 +7,8 @@
 #include <stack>
 #include <queue>
 #include <unordered_set>
+#include <cstdint>
+#include <array>
 
 enum Border : uint8_t {
     NONE = 0,
@@ -37,24 +39,24 @@ struct Square {
 class Maze {
 public:
     std::vector<Square> squares;
-    uint16_t width_, height_;
+    uint32_t width_, height_;
 
-    Maze(uint16_t w, uint16_t h) : width_(w), height_(h), squares(w * h) {
-        for (uint16_t y = 0; y < h; ++y) {
-            for (uint16_t x = 0; x < w; ++x) {
+    Maze(uint32_t w, uint32_t h) : width_(w), height_(h), squares(w * h) {
+        for (uint32_t y = 0; y < h; ++y) {
+            for (uint32_t x = 0; x < w; ++x) {
                 at(y, x) = Square(y * w + x, y, x, Border::ALL);
             }
         }
     }
 
-    uint16_t width() const { return width_; }
-    uint16_t height() const { return height_; }
+    uint32_t width() const { return width_; }
+    uint32_t height() const { return height_; }
 
-    Square& at(uint16_t row, uint16_t col) {
+    Square& at(uint32_t row, uint32_t col) {
         return squares[row * width_ + col];
     }
 
-    const Square& at(uint16_t row, uint16_t col) const {
+    const Square& at(uint32_t row, uint32_t col) const {
         return squares[row * width_ + col];
     }
 };
@@ -91,23 +93,24 @@ void dump_squares(const Maze& maze, const std::string& path) {
     }
 }
 
-Maze generate_maze_dfs(uint16_t width, uint16_t height) {
+
+Maze generate_maze_dfs(uint32_t width, uint32_t height) {
     Maze maze(width, height);
-    std::stack<std::pair<uint16_t, uint16_t>> stack;
+    std::stack<std::pair<uint32_t, uint32_t>> stack;
     std::mt19937 gen(std::random_device{}());
 
-    static const std::array<std::pair<int16_t, int16_t>, 4> directions = {{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}};
+    static const std::array<std::pair<int32_t, int32_t>, 4> directions = {{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}};
     static const std::array<Border, 4> borders = {Border::TOP, Border::RIGHT, Border::BOTTOM, Border::LEFT};
 
-    auto carve_passages = [&](uint16_t cx, uint16_t cy) {
+    auto carve_passages = [&](uint32_t cx, uint32_t cy) {
         stack.emplace(cx, cy);
         while (!stack.empty()) {
             auto [x, y] = stack.top();
             std::vector<uint8_t> unvisited_neighbors;
 
             for (uint8_t i = 0; i < 4; ++i) {
-                uint16_t nx = x + directions[i].first;
-                uint16_t ny = y + directions[i].second;
+                uint32_t nx = x + directions[i].first;
+                uint32_t ny = y + directions[i].second;
                 if (nx < width && ny < height && maze.at(ny, nx).border == Border::ALL) {
                     unvisited_neighbors.push_back(i);
                 }
@@ -115,8 +118,8 @@ Maze generate_maze_dfs(uint16_t width, uint16_t height) {
 
             if (!unvisited_neighbors.empty()) {
                 uint8_t dir = unvisited_neighbors[std::uniform_int_distribution<>(0, unvisited_neighbors.size() - 1)(gen)];
-                uint16_t nx = x + directions[dir].first;
-                uint16_t ny = y + directions[dir].second;
+                uint32_t nx = x + directions[dir].first;
+                uint32_t ny = y + directions[dir].second;
                 maze.at(y, x).border = maze.at(y, x).border & ~borders[dir];
                 maze.at(ny, nx).border = maze.at(ny, nx).border & ~borders[(dir + 2) % 4];
                 stack.emplace(nx, ny);
@@ -156,22 +159,22 @@ public:
     }
 };
 
-Maze generate_maze_kruskal(uint16_t width, uint16_t height) {
+Maze generate_maze_kruskal(uint32_t width, uint32_t height) {
     Maze maze(width, height);
     std::mt19937 gen(std::random_device{}());
 
     struct Edge {
-        uint16_t x1, y1, x2, y2;
+        uint32_t x1, y1, x2, y2;
         Border border;
     };
 
     std::vector<Edge> edges;
     edges.reserve(2 * width * height - width - height);
 
-    for (uint16_t y = 0; y < height; ++y) {
-        for (uint16_t x = 0; x < width; ++x) {
-            if (x < width - 1) edges.push_back({x, y, static_cast<uint16_t>(x + 1), y, Border::RIGHT});
-            if (y < height - 1) edges.push_back({x, y, x, static_cast<uint16_t>(y + 1), Border::BOTTOM});
+    for (uint32_t y = 0; y < height; ++y) {
+        for (uint32_t x = 0; x < width; ++x) {
+            if (x < width - 1) edges.push_back({x, y, x + 1, y, Border::RIGHT});
+            if (y < height - 1) edges.push_back({x, y, x, y + 1, Border::BOTTOM});
         }
     }
 
@@ -196,17 +199,17 @@ Maze generate_maze_kruskal(uint16_t width, uint16_t height) {
     return maze;
 }
 
-Maze generate_maze_prim(uint16_t width, uint16_t height) {
+Maze generate_maze_prim(uint32_t width, uint32_t height) {
     Maze maze(width, height);
     std::mt19937 gen(std::random_device{}());
 
-    static const std::array<std::pair<int16_t, int16_t>, 4> directions = {{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}};
+    static const std::array<std::pair<int32_t, int32_t>, 4> directions = {{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}};
     static const std::array<Border, 4> borders = {Border::TOP, Border::RIGHT, Border::BOTTOM, Border::LEFT};
 
-    std::vector<std::pair<uint16_t, uint16_t>> frontier;
+    std::vector<std::pair<uint32_t, uint32_t>> frontier;
     std::vector<std::vector<bool>> in_maze(height, std::vector<bool>(width, false));
 
-    auto add_to_frontier = [&](uint16_t x, uint16_t y) {
+    auto add_to_frontier = [&](uint32_t x, uint32_t y) {
         if (x < width && y < height && !in_maze[y][x]) {
             frontier.emplace_back(x, y);
             in_maze[y][x] = true;
@@ -224,8 +227,8 @@ Maze generate_maze_prim(uint16_t width, uint16_t height) {
 
         std::vector<uint8_t> neighbors;
         for (uint8_t i = 0; i < 4; ++i) {
-            uint16_t nx = x + directions[i].first;
-            uint16_t ny = y + directions[i].second;
+            uint32_t nx = x + directions[i].first;
+            uint32_t ny = y + directions[i].second;
             if (nx < width && ny < height && in_maze[ny][nx] && maze.at(ny, nx).border & borders[(i + 2) % 4]) {
                 neighbors.push_back(i);
             }
@@ -233,8 +236,8 @@ Maze generate_maze_prim(uint16_t width, uint16_t height) {
 
         if (!neighbors.empty()) {
             uint8_t dir = neighbors[std::uniform_int_distribution<>(0, neighbors.size() - 1)(gen)];
-            uint16_t nx = x + directions[dir].first;
-            uint16_t ny = y + directions[dir].second;
+            uint32_t nx = x + directions[dir].first;
+            uint32_t ny = y + directions[dir].second;
             maze.at(y, x).border = maze.at(y, x).border & ~borders[dir];
             maze.at(ny, nx).border = maze.at(ny, nx).border & ~borders[(dir + 2) % 4];
         }
@@ -251,7 +254,8 @@ Maze generate_maze_prim(uint16_t width, uint16_t height) {
 }
 
 int main() {
-    uint16_t width, height, choice;
+    uint32_t width, height;
+    int choice;
     std::cout << "Enter maze width: ";
     std::cin >> width;
     std::cout << "Enter maze height: ";

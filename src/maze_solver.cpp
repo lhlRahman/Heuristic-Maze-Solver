@@ -614,49 +614,51 @@ std::vector<Square> solve_maze(int width, int height, const std::vector<Square>&
 
 // C interface functions
 extern "C" {
-    Square** solve_maze_c(int width, int height, Square* squares, int start_row, int start_col, int goal_row, int goal_col, const char* algorithm, bool animation, float delay, const char* direction) {
+    Square** solve_maze(int width, int height, Square* squares, int start_row, int start_col, 
+                        int goal_row, int goal_col, const char* algorithm, bool animation, 
+                        float delay, bool top_down) {
         std::vector<Square> squares_vec(squares, squares + width * height);
-        std::vector<Square> solution = solve_maze(width, height, squares_vec, start_row, start_col, goal_row, goal_col, algorithm, animation, delay, direction);
+        std::string algo_str(algorithm);
+        std::string direction = top_down ? "top-down" : "bottom-up";
+        std::vector<Square> solution = solve_maze(width, height, squares_vec, start_row, start_col, 
+                                                  goal_row, goal_col, algo_str, animation, delay, direction);
         
-        Square** result = new Square*[g_steps.size()];
+        Square** result = new Square*[g_steps.size() + 1];  // +1 for null terminator
         for (size_t i = 0; i < g_steps.size(); ++i) {
             result[i] = new Square[g_steps[i].size()];
             std::copy(g_steps[i].begin(), g_steps[i].end(), result[i]);
         }
+        result[g_steps.size()] = nullptr;  // Null terminator
         return result;
     }
 
-    int get_step_count() {
-        return g_step_count;
-    }
-
-    int get_step_size(int step_index) {
-        if (step_index >= 0 && step_index < g_step_count) {
-            return g_steps[step_index].size();
-        }
-        return 0;
-    }
-
     void free_steps(Square** steps) {
-        for (int i = 0; i < g_step_count; ++i) {
+        for (int i = 0; steps[i] != nullptr; ++i) {
             delete[] steps[i];
         }
         delete[] steps;
     }
 
-    void generate_html_c(const Square* path, int path_length, const char* output_file) {
-        std::vector<Square> path_vec(path, path + path_length);
-        generate_html(path_vec, output_file);
+    void generate_html(Square* squares, const char* output_path) {
+        int path_length = 0;
+        while (squares[path_length].index != -1) {  // Assuming -1 index indicates end of path
+            path_length++;
+        }
+        std::vector<Square> path_vec(squares, squares + path_length);
+        generate_html(path_vec, output_path);
     }
 
-    void generate_html_animation_c(int width, int height, const Square* steps, int* step_lengths, int num_steps, const char* output_dir, float delay, bool top_down) {
+    void generate_html_animation(int width, int height, Square** steps, 
+                                 const char* output_path, float delay, bool top_down) {
         std::vector<std::vector<Square>> steps_vec;
-        const Square* current_step = steps;
-        for (int i = 0; i < num_steps; ++i) {
-            steps_vec.emplace_back(current_step, current_step + step_lengths[i]);
-            current_step += step_lengths[i];
+        for (int i = 0; steps[i] != nullptr; ++i) {
+            int step_length = 0;
+            while (steps[i][step_length].index != -1) {
+                step_length++;
+            }
+            steps_vec.emplace_back(steps[i], steps[i] + step_length);
         }
-        Maze maze(width, height, std::vector<Square>(steps, steps + width * height));
-        generate_html_animation(steps_vec, maze, output_dir, delay, top_down);
+        Maze maze(width, height, std::vector<Square>(steps[0], steps[0] + width * height));
+        generate_html_animation(steps_vec, maze, output_path, delay, top_down);
     }
 }

@@ -169,7 +169,7 @@ def decompress(square_value: int) -> tuple[Border, Role]:
 def time_algorithms(maze_path: Path, output_dir: Path, animation: bool, delay: float, direction: str) -> None:
     algorithms = [
         "bfs", "a-star", "dfs", "dijkstra", "greedy", "wall-follower", 
-        "dead-end", "recursive-bt", "tremaux", "lee", 
+        "dead-end", "tremaux", "lee", 
         "best-first", "wavefront", "jump-point", 
         "fringe"]
     
@@ -178,8 +178,10 @@ def time_algorithms(maze_path: Path, output_dir: Path, animation: bool, delay: f
     for algorithm in algorithms:
         start_time = time.time()
         try:
+            print(f"Timing {algorithm} algorithm")
             solve_maze_python_wrapper(maze_path, output_dir, algorithm, animation, delay, direction, True)
             elapsed_time = time.time() - start_time
+            print(f"{algorithm}: {elapsed_time:.2f} seconds")
             results.append((algorithm, elapsed_time))
         except Exception as e:
             results.append((algorithm, float('inf')))  # Use inf to indicate failure
@@ -196,4 +198,4 @@ def time_algorithms(maze_path: Path, output_dir: Path, animation: bool, delay: f
             print(f"{algorithm}: {elapsed_time:.2f} seconds")
 
 if __name__ == "__main__":
-    main()
+    time_algorithms(Path("large_example.maze"), Path("output"), False, 0.5, "top-down")

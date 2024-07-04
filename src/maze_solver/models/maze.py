@@ -2,22 +2,36 @@
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
+import pathlib
 from typing import List, Iterator
 
 from maze_solver.models.role import Role
 from maze_solver.models.square import Square
+from maze_solver.persistence.serializer import load_squares
 
 @dataclass(frozen=True)
 class Maze:
     squares: List[Square]
 
     @classmethod
-    def load(cls, path: Path) -> "Maze":
-        from maze_solver.persistence.serializer import load_squares
+    def load(cls, path: pathlib.Path) -> "Maze":
+        print(f"Loading maze from {path}")
         squares = list(load_squares(path))
+        print(f"Loaded {len(squares)} squares")
         if not squares:
-            raise ValueError("The maze file is empty or malformed")
-        return cls(squares)
+            raise ValueError("No squares loaded from the file")
+        
+        # Calculate width and height based on the number of squares
+        total_squares = len(squares)
+        width = int(total_squares**0.5)  # Assuming it's a square maze
+        height = total_squares // width
+        
+        print(f"Calculated maze dimensions: {width}x{height}")
+        entrance = next((s for s in squares if s.role == Role.ENTRANCE), None)
+        exit = next((s for s in squares if s.role == Role.EXIT), None)
+        print(f"Entrance: {entrance}")
+        print(f"Exit: {exit}")
+        return cls(tuple(squares))
 
     def dump(self, path: Path) -> None:
         from maze_solver.persistence.serializer import dump_squares

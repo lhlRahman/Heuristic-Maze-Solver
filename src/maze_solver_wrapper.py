@@ -1,80 +1,100 @@
-# maze_solver_wrapper.py
 import ctypes
-from ctypes import c_bool, c_char_p, c_float, c_int, Structure, POINTER
-from typing import List, Iterable
+from typing import List
+import os
+import sys
 
-class SquareC(Structure):
-    _fields_ = [
-        ("row", c_int),
-        ("column", c_int),
-        ("index", c_int),
-        ("border", c_int),
-        ("role", c_int)
+def find_library(lib_name):
+    possible_locations = [
+        os.path.dirname(os.path.abspath(__file__)),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'),
+        os.getcwd(),
     ]
 
-# Load the shared library
-maze_solver_lib = ctypes.CDLL('./libmaze_solver.dylib')
-# Define the C functions
-maze_solver_lib.solve_maze_c.argtypes = [c_int, c_int, POINTER(SquareC), c_int, c_int, c_int, c_int, c_char_p, c_bool, c_float, c_char_p]
-maze_solver_lib.solve_maze_c.restype = POINTER(POINTER(SquareC))
+    for location in possible_locations:
+        lib_path = os.path.join(location, lib_name)
+        if os.path.exists(lib_path):
+            return lib_path
 
-maze_solver_lib.get_step_count.argtypes = []
-maze_solver_lib.get_step_count.restype = c_int
+    raise FileNotFoundError(f"Could not find {lib_name} in any of the expected locations")
 
-maze_solver_lib.get_step_size.argtypes = [c_int]
-maze_solver_lib.get_step_size.restype = c_int
+# Debug information
+print("Python version:", sys.version)
+print("Current working directory:", os.getcwd())
+print("Script directory:", os.path.dirname(os.path.abspath(__file__)))
+print("Parent directory:", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-maze_solver_lib.free_steps.argtypes = [POINTER(POINTER(SquareC))]
-maze_solver_lib.free_steps.restype = None
+# Try to find and load the library
+try:
+    dylib_path = find_library('libmaze_solver.dylib')
+    print(f"Found library at: {dylib_path}")
+    maze_solver_lib = ctypes.CDLL(dylib_path)
+    print("Successfully loaded the library")
+    print("Available functions in the library:")
+    for name in dir(maze_solver_lib):
+        if not name.startswith('_'):
+            print(f"  {name}")
+except FileNotFoundError as e:
+    print(f"Error: {e}")
+    print("Please ensure that libmaze_solver.dylib is built and located in the project directory.")
+    sys.exit(1)
 
-maze_solver_lib.generate_html_c.argtypes = [POINTER(SquareC), c_int, c_char_p]
-maze_solver_lib.generate_html_c.restype = None
+# Define the SquareC class
+class SquareC(ctypes.Structure):
+    _fields_ = [("row", ctypes.c_int),
+                ("column", ctypes.c_int),
+                ("index", ctypes.c_int),
+                ("border", ctypes.c_int),
+                ("role", ctypes.c_int)]
 
-maze_solver_lib.generate_html_animation_c.argtypes = [c_int, c_int, POINTER(SquareC), POINTER(c_int), c_int, c_char_p, c_float, c_bool]
-maze_solver_lib.generate_html_animation_c.restype = None
+# Try to set up function signatures
+try:
+    maze_solver_lib.solve_maze.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.POINTER(SquareC),
+                                           ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                                           ctypes.c_char_p, ctypes.c_bool, ctypes.c_float, ctypes.c_bool]
+    maze_solver_lib.solve_maze.restype = ctypes.POINTER(ctypes.POINTER(SquareC))
 
-def solve_maze(width, height, squares, start_row, start_col, goal_row, goal_col, algorithm, animation, delay, direction):
-    SquareArrayType = SquareC * len(squares)
-    squares_array = SquareArrayType(*squares)
+    maze_solver_lib.generate_html.argtypes = [ctypes.POINTER(SquareC), ctypes.c_char_p]
+    maze_solver_lib.generate_html.restype = None
+
+    maze_solver_lib.generate_html_animation.argtypes = [ctypes.c_int, ctypes.c_int, 
+                                                        ctypes.POINTER(ctypes.POINTER(SquareC)),
+                                                        ctypes.c_char_p, ctypes.c_float, ctypes.c_bool]
+    maze_solver_lib.generate_html_animation.restype = None
     
-    steps_ptr = maze_solver_lib.solve_maze_c(width, height, squares_array, start_row, start_col, goal_row, goal_col, 
-                                             algorithm.encode('utf-8'), animation, delay, direction.encode('utf-8'))
-    
-    step_count = maze_solver_lib.get_step_count()
+    print("Successfully set up function signatures")
+except AttributeError as e:
+    print(f"Error setting up function signatures: {e}")
+    print("This likely means that one or more expected functions are not present in the library.")
+    print("Please check that the C++ library has been compiled correctly and includes all necessary functions.")
+    sys.exit(1)
+
+def solve_maze(width: int, height: int, squares: List[SquareC], start_row: int, start_col: int, 
+               goal_row: int, goal_col: int, algorithm: str, animation: bool, delay: float, 
+               top_down: bool) -> List[List[SquareC]]:
+    squares_array = (SquareC * len(squares))(*squares)
+    result = maze_solver_lib.solve_maze(width, height, squares_array, start_row, start_col, 
+                                        goal_row, goal_col, algorithm.encode('utf-8'), 
+                                        animation, delay, top_down)
     steps = []
-    for i in range(step_count):
-        step_size = maze_solver_lib.get_step_size(i)
-        step = [steps_ptr[i][j] for j in range(step_size)]
+    i = 0
+    while result[i]:
+        step = [result[i][j] for j in range(width * height)]
         steps.append(step)
-    
-    maze_solver_lib.free_steps(steps_ptr)
-    
+        i += 1
     return steps
 
-def generate_html(path, output_file):
-    SquareArrayType = SquareC * len(path)
-    path_array = SquareArrayType(*path)
-    maze_solver_lib.generate_html_c(path_array, len(path), output_file.encode('utf-8'))
+def generate_html(squares: List[SquareC], output_path: str) -> None:
+    squares_array = (SquareC * len(squares))(*squares)
+    maze_solver_lib.generate_html(squares_array, output_path.encode('utf-8'))
 
-def validate_steps(steps: List[List[SquareC]]) -> bool:
-    for step in steps:
-        if not isinstance(step, Iterable):
-            print(f"Step {step} is not an iterable")
-            return False
-        if not all(isinstance(sq, SquareC) for sq in step):
-            print(f"Step {step} contains non-SquareC elements")
-            return False
-    return True
+def generate_html_animation(width: int, height: int, steps: List[List[SquareC]], 
+                            output_path: str, delay: float, top_down: bool) -> None:
+    steps_array = (ctypes.POINTER(SquareC) * len(steps))()
+    for i, step in enumerate(steps):
+        step_array = (SquareC * len(step))(*step)
+        steps_array[i] = step_array
+    maze_solver_lib.generate_html_animation(width, height, steps_array, 
+                                            output_path.encode('utf-8'), delay, top_down)
 
-def generate_html_animation(width, height, steps, output_dir, delay, top_down):
-    steps_count = len(steps)
-    steps_sizes = (c_int * steps_count)(*(len(step) for step in steps))
-    steps_array = (SquareC * sum(len(step) for step in steps))()
-
-    offset = 0
-    for step in steps:
-        for square in step:
-            steps_array[offset] = square
-            offset += 1
-    
-    maze_solver_lib.generate_html_animation_c(width, height, steps_array, steps_sizes, steps_count, output_dir.encode('utf-8'), delay, top_down)
+print("maze_solver_wrapper.py loaded successfully")
